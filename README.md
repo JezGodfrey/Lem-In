@@ -80,3 +80,6 @@ The following rules of the problem are adhered to by the program:
 - The rooms names will not necessarily be numbers, and in order.
 - Any unknown command will be ignored.
 - The program handles errors carefully.
+
+### Author
+Jez Godfrey - As part of the 01 Founders fellowship
