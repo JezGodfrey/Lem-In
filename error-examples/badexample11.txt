@@ -1,0 +1,29 @@
+9
+##start
+A 0 1
+B 7 0
+C 14 0
+D 7 1
+E 14 1
+F 2 2
+G 4 2
+H 6 2
+I 8 2
+J 10 2
+K 12 2
+L 14 2
+M 16 2
+##end
+END 18 1
+A-B
+A-D
+A-F
+B-C
+C-END
+D-E
+E-END
+F-G
+G-H
+H-I
+I-J
+J-END
