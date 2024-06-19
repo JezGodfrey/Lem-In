@@ -60,7 +60,9 @@ To solve this problem, the program performs the following steps:
 - Find every path possible from start-room to end-room
 - Of those paths determine the maximum number of paths that could be used (determined by number of rooms linked to the start/end rooms)
 - For 1 path to n maximum number of paths*, determine the optimal paths by starting with the shortest available path and searching for the next shortest path which uses no rooms from the preceding paths
-- For each set of paths, run the simulation where ants travel down the paths, recording each turn
+- For each set of paths, set ants on their paths and run the simulation, recording each turn
+- Ants are set on paths from the shortest to the longest, based on how many rooms are in the path and how many ants are already assigned on that path
+- Each ant moves one at a time, waiting if the next room is full, and the simulation is recursively run until all ants have reached the end
 - Count the number of turns taken for each set of paths and display the results of the set of paths that took the least number of turns
 
 *With unique paths being the key factor, sometimes more paths isn't the most optimal; it depends on the number of ants travelling the graph.
@@ -80,6 +82,3 @@ The following rules of the problem are adhered to by the program:
 - The rooms names will not necessarily be numbers, and in order.
 - Any unknown command will be ignored.
 - The program handles errors carefully.
-
-### Author
-Jez Godfrey - As part of the 01 Founders fellowship

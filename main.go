@@ -16,14 +16,6 @@ func ErrorMessage(s string) {
 	log.Fatal("ERROR: invalid data format", s)
 }
 
-func PrintResults(ls []string) {
-	for _, l := range ls {
-		fmt.Println(l)
-	}
-
-	fmt.Printf("\n")
-}
-
 func GetFileLines(p string) []string {
 	file, err := os.Open(p)
 	if err != nil {
@@ -31,17 +23,14 @@ func GetFileLines(p string) []string {
 	}
 
 	// Use bufio to scan lines and store them in slice lines
+	var lines []string
 	scanner := bufio.NewScanner(file)
 	scanner.Split(bufio.ScanLines)
-
-	var lines []string
-
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
 
 	file.Close()
-
 	return lines
 }
 
@@ -50,15 +39,15 @@ func FormatCheck(rooms []string, coords []Vector2) {
 	if len(rooms) < 2 {
 		ErrorMessage(", not enough rooms")
 	}
+
 	var roomsCopy []string
-	for _, r := range rooms {
-		roomsCopy = append(roomsCopy, r)
-	}
+	roomsCopy = append(roomsCopy, rooms...)
 	slices.Sort(roomsCopy)
 	roomsCopy = slices.Compact(roomsCopy)
 	if len(rooms) > len(roomsCopy) {
 		ErrorMessage(", duplicate rooms")
 	}
+
 	for i, xy := range coords {
 		if xy.x > 1000 || xy.y > 1000 {
 			ErrorMessage(", invalid room co-ordinates")
@@ -74,18 +63,6 @@ func FormatCheck(rooms []string, coords []Vector2) {
 			}
 		}
 	}
-}
-
-func countLine(s string) int {
-	count := 0
-
-	for _, c := range s {
-		if c == '\n' {
-			count++
-		}
-	}
-
-	return count
 }
 
 // Split the file into rooms, co-ordinates and tunnels
@@ -199,7 +176,7 @@ func MapConnections(lines []string, connections int) map[string][]string {
 	return connects
 }
 
-// Search for all possible paths from start to end
+// Recursively earch for all possible paths from start to end
 func SearchPaths(start string, end string, m map[string][]string, path []string, paths *string) {
 	BackTrack := false
 
@@ -258,6 +235,7 @@ func FindMaxPaths(paths [][]string) int {
 
 // Finding paths with unique rooms from each other
 func OptimisePaths(MaxPaths int, paths [][]string, temppaths [][]string, allPaths *[][][]string, found *bool) {
+	// Recursively search until optimal paths are found - append set to allPaths
 	if len(temppaths) == MaxPaths {
 		*allPaths = append(*allPaths, temppaths)
 		*found = true
@@ -268,19 +246,14 @@ func OptimisePaths(MaxPaths int, paths [][]string, temppaths [][]string, allPath
 		temppaths = append(temppaths, paths[0])
 	}
 
+	// Store all rooms found so far into a slice
 	var dupecheck []string
 	var dupechecker []string
 	for _, p := range temppaths {
-		for _, n := range p[1 : len(p)-1] {
-			dupecheck = append(dupecheck, n)
-		}
+		dupecheck = append(dupecheck, p[1:len(p)-1]...)
 	}
 
 	for i := 1; i < len(paths); i++ {
-		if *found {
-			return
-		}
-
 		redundant := false
 		for _, p := range temppaths {
 			if p[1] == paths[i][1] {
@@ -292,17 +265,13 @@ func OptimisePaths(MaxPaths int, paths [][]string, temppaths [][]string, allPath
 			continue
 		}
 
-		for _, n := range paths[i][1 : len(paths[i])-1] {
-			dupecheck = append(dupecheck, n)
-		}
-
-		for _, n := range dupecheck {
-			dupechecker = append(dupechecker, n)
-		}
-
+		// Append next path, copy to dupechecker and compact to remove duplicates
+		dupecheck = append(dupecheck, paths[i][1:len(paths[i])-1]...)
+		dupechecker = append(dupechecker, dupecheck...)
 		slices.Sort(dupechecker)
 		dupechecker = slices.Compact(dupechecker)
 
+		// if the lengths match, there are no duplicate rooms, so continue the search
 		if len(dupecheck) == len(dupechecker) {
 			temppaths = append(temppaths, paths[i])
 			OptimisePaths(MaxPaths, paths, temppaths, allPaths, found)
@@ -314,11 +283,10 @@ func OptimisePaths(MaxPaths int, paths [][]string, temppaths [][]string, allPath
 			temppaths = temppaths[:len(temppaths)-1]
 		}
 
+		// Reset for next iteration
 		dupecheck = nil
 		for _, p := range temppaths {
-			for _, n := range p[1 : len(p)-1] {
-				dupecheck = append(dupecheck, n)
-			}
+			dupecheck = append(dupecheck, p[1:len(p)-1]...)
 		}
 		dupechecker = nil
 	}
@@ -343,10 +311,9 @@ func GetPaths(ps string, end string) [][]string {
 }
 
 type Ant struct {
-	Id       int
-	Path     []string
-	Pos      int
-	LeftHome bool
+	Id   int
+	Path []string
+	Pos  int
 }
 
 type Vector2 struct {
@@ -354,49 +321,53 @@ type Vector2 struct {
 	y int
 }
 
-func LemIn(ants []Ant, rooms []string, paths [][]string, Occupied map[string]bool, result *string) bool {
-	var steps string
-	var antsRemaining int
-	Complete := true
-	startToEnd := false
+// Function to optimally distribute ants amongst paths
+func SetAntPaths(as []Ant, ps [][]string) {
+	antsOnPath := make(map[int]int)
 
-	// Check how many ants are still at home
-	for _, ant := range ants {
-		if !ant.LeftHome {
-			antsRemaining++
+	for i := 0; i < len(ps); i++ {
+		antsOnPath[i] = 0
+	}
+
+	as[0].Path = ps[0]
+	antsOnPath[0] = 1
+	current := 0
+
+	for i := 1; i < len(as); i++ {
+		next := current + 1
+		if current == len(ps)-1 {
+			next = 0
+		}
+
+		// If the number of rooms and ants exceed that of the next path, place ant on next path
+		if len(ps[current])+antsOnPath[current] > len(ps[next])+antsOnPath[next] {
+			as[i].Path = ps[next]
+			antsOnPath[next]++
+			current = next
+		} else {
+			as[i].Path = ps[0]
+			antsOnPath[0]++
+			current = 0
 		}
 	}
+}
+
+func LemIn(ants []Ant, rooms []string, paths [][]string, Occupied map[string]bool, result *string) bool {
+	var steps string
+	Complete := true
+	startToEnd := false
 
 	// For all ants, move along/change paths so long as they haven't reached the end
 	for i := range ants {
 		if ants[i].Pos != len(ants[i].Path)-1 {
-			newPath := false
-
 			// If the next room in the path is occupied, move to the next free path available, else wait
-			if Occupied[ants[i].Path[ants[i].Pos+1]] || startToEnd {
-				for _, p := range paths {
-					if ants[i].Path[1] != p[1] && !Occupied[p[ants[i].Pos+1]] {
-						// Don't go to the next path if it's quicker to wait for current path to be free
-						if antsRemaining <= len(paths) && len(p)-len(ants[i].Path) > 1 {
-							break
-						}
-
-						ants[i].Path = p
-						newPath = true
-						break
-					}
-
-				}
-
-				if !newPath {
-					continue
-				}
+			if Occupied[ants[i].Path[ants[i].Pos+1]] || (len(ants[i].Path) == 2 && startToEnd) {
+				continue
 			}
 
 			// Moving ants forward
 			ants[i].Pos = ants[i].Pos + 1
 			Occupied[ants[i].Path[ants[i].Pos-1]] = false
-			ants[i].LeftHome = true
 			steps = steps + "L" + strconv.Itoa(ants[i].Id) + "-" + ants[i].Path[ants[i].Pos] + " "
 
 			// If ant hasn't reached end, set their new room to occupied, else check if 2 room path
@@ -455,9 +426,7 @@ func main() {
 	}
 
 	var linesCopy []string
-	for _, l := range lines {
-		linesCopy = append(linesCopy, l)
-	}
+	linesCopy = append(linesCopy, lines...)
 	slices.Sort(linesCopy)
 	linesCopy = slices.Compact(linesCopy)
 	if len(linesCopy) < len(lines) {
@@ -474,7 +443,6 @@ func main() {
 		for _, v := range c {
 			if !slices.Contains(rooms, v) {
 				ErrorMessage(", unknown room in tunnels")
-
 			}
 		}
 	}
@@ -485,7 +453,6 @@ func main() {
 	var pathsBuild string
 
 	SearchPaths(rooms[0], rooms[len(rooms)-1], connects, pathBuild, &pathsBuild)
-
 	if pathsBuild == "" {
 		ErrorMessage(", no viable paths")
 	}
@@ -531,32 +498,29 @@ func main() {
 	var steps string
 
 	for i := 1; i < numberOfAnts+1; i++ {
-		ants = append(ants, Ant{i, nil, 0, false})
+		ants = append(ants, Ant{i, nil, 0})
 	}
 
+	// Set ants on their paths and walk them
 	for _, paths := range allPaths {
-		for i := 0; i < len(ants); i++ {
-			ants[i].Path = paths[0]
-		}
+		SetAntPaths(ants, paths)
 		LemIn(ants, rooms[0:len(rooms)-1], paths, roomChecker, &steps)
 		allSteps = append(allSteps, steps)
 		steps = ""
 		for i := 0; i < numberOfAnts; i++ {
-			ants[i].Path, ants[i].Pos, ants[i].LeftHome = nil, 0, false
+			ants[i].Path, ants[i].Pos = nil, 0
 		}
 	}
 
+	// Finding which set of paths required the least number of turns
 	var fastest int
-
 	for i := 0; i < len(allSteps); i++ {
-		// fmt.Printf("%v\n\n", allSteps[i])
-
-		if countLine(allSteps[i]) < countLine(allSteps[fastest]) {
+		if len(strings.Split(allSteps[i], "\n")) < len(strings.Split(allSteps[fastest], "\n")) {
 			fastest = i
 			continue
 		}
 
-		if countLine(allSteps[i]) == countLine(allSteps[fastest]) {
+		if len(strings.Split(allSteps[i], "\n")) == len(strings.Split(allSteps[fastest], "\n")) {
 			if len(strings.Split(allSteps[i], " ")) < len(strings.Split(allSteps[fastest], " ")) {
 				fastest = i
 			}
